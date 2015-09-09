@@ -37,6 +37,10 @@ public class MapsActivity extends FragmentActivity
     private GoogleMap mMap;
     private boolean mTrackPosition = false;
     private ImageView imgMyLocationTrackingOff;
+
+    private static final boolean YES_ZOOM = true;
+    private static final boolean NO_ZOOM = false;
+
     //private FrameLayout imgMyLocationTrackingOffContainer;
 
     // These settings are the same as the settings for the map. They will in fact give you updates
@@ -111,32 +115,35 @@ public class MapsActivity extends FragmentActivity
         //TODO: LOG! Toast.makeText(getApplicationContext(), msg, Toast.LENGTH_SHORT).show();
     }
 
-    private void panToLocation(Location location) {
+    private void panToLocation(Location location, boolean zoom_in) {
         // Location lat-lng
         LatLng loc = new LatLng(location.getLatitude(), location.getLongitude());
 
-        // Location accuracy diameter (in meters)
-        float accuracy = location.getAccuracy() * 2;
+        float zoomLevel = mMap.getCameraPosition().zoom;
 
-        // Screen measurements
-        DisplayMetrics metrics = new DisplayMetrics();
-        getWindowManager().getDefaultDisplay().getMetrics(metrics);
-        // Use min(width, height) (to properly fit the screen
-        int screenSize = Math.min(metrics.widthPixels, metrics.heightPixels);
+        if (zoom_in) {
+            // Location accuracy diameter (in meters)
+            float accuracy = location.getAccuracy() * 2;
 
-        // Equators length
-        long equator = 40075004;
+            // Screen measurements
+            DisplayMetrics metrics = new DisplayMetrics();
+            getWindowManager().getDefaultDisplay().getMetrics(metrics);
+            // Use min(width, height) (to properly fit the screen
+            int screenSize = Math.min(metrics.widthPixels, metrics.heightPixels);
 
-        // The meters per pixel required to show the whole area the user might be located in
-        double requiredMpp = accuracy / screenSize;
+            // Equators length
+            long equator = 40075004;
 
-        // Calculate the zoom level
-        double zoomLevel = ((Math.log(equator / (256 * requiredMpp))) / Math.log(2)) -2;
+            // The meters per pixel required to show the whole area the user might be located in
+            double requiredMpp = accuracy / screenSize;
+
+            // Calculate the zoom level
+            zoomLevel = (float) Math.max(0, ((Math.log(equator / (256 * requiredMpp))) / Math.log(2)) - 2);
+        }
 
         // Center to user's position
-        mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(loc, (float) zoomLevel));
+        mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(loc, zoomLevel));
         Log.i("Panned To", loc.toString() + " _ " + zoomLevel);
-
     }
 
     /**
@@ -145,7 +152,7 @@ public class MapsActivity extends FragmentActivity
     @Override
     public void onLocationChanged(Location location) {
         if (mTrackPosition) {
-           panToLocation(location);
+           panToLocation(location, NO_ZOOM);
         }
 
         Log.i("Location Listener", location.toString());
@@ -188,7 +195,7 @@ public class MapsActivity extends FragmentActivity
 
         if (mTrackPosition) {
             imgMyLocationTrackingOff.setImageResource(R.mipmap.tracking_on);
-            panToLocation(getMyLocation());
+            panToLocation(getMyLocation(), YES_ZOOM);
         } else {
             imgMyLocationTrackingOff.setImageResource(R.mipmap.tracking_off);
         }
