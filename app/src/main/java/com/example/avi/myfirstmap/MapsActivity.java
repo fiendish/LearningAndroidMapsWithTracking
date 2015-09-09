@@ -131,7 +131,7 @@ public class MapsActivity extends FragmentActivity
         double requiredMpp = accuracy / screenSize;
 
         // Calculate the zoom level
-        double zoomLevel = ((Math.log(equator / (256 * requiredMpp))) / Math.log(2)) -1;
+        double zoomLevel = ((Math.log(equator / (256 * requiredMpp))) / Math.log(2)) -2;
 
         // Center to user's position
         mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(loc, (float) zoomLevel));
@@ -144,7 +144,7 @@ public class MapsActivity extends FragmentActivity
      */
     @Override
     public void onLocationChanged(Location location) {
-        if (mTrackPosition == true) {
+        if (mTrackPosition) {
            panToLocation(location);
         }
 
@@ -153,7 +153,7 @@ public class MapsActivity extends FragmentActivity
     }
 
     /**
-     * Callback called when connected to GCore. Implementation of {@link ConnectionCallbacks}.
+     * Callback called when connected to GCore. Implementation of {@link GoogleApiClient.ConnectionCallbacks}.
      */
     @Override
     public void onConnected(Bundle connectionHint) {
@@ -164,7 +164,7 @@ public class MapsActivity extends FragmentActivity
     }
 
     /**
-     * Callback called when disconnected from GCore. Implementation of {@link ConnectionCallbacks}.
+     * Callback called when disconnected from GCore. Implementation of {@link GoogleApiClient.ConnectionCallbacks}.
      */
     @Override
     public void onConnectionSuspended(int cause) {
@@ -172,7 +172,7 @@ public class MapsActivity extends FragmentActivity
     }
 
     /**
-     * Implementation of {@link OnConnectionFailedListener}.
+     * Implementation of {@link GoogleApiClient.OnConnectionFailedListener}.
      */
     @Override
     public void onConnectionFailed(ConnectionResult result) {
