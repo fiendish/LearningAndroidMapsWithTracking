@@ -13,11 +13,13 @@ android:orientation="vertical" >
         android:name="com.google.android.gms.maps.SupportMapFragment" />
 
     <ImageView
-        android:id="@+id/imgMyLocationTrackingOff"
+        android:id="@+id/imgMyLocationTracking"
         android:layout_width="35dp"
         android:layout_height="35dp"
-        android:layout_gravity="top|right"
-        android:src="@mipmap/tracking_off">
+        android:layout_gravity="top|end"
+        android:src="@mipmap/tracking_off"
+        android:visibility="invisible"
+        android:contentDescription="@string/enable_panning">
     </ImageView>
 
 </FrameLayout>
