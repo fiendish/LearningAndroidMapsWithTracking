@@ -2,7 +2,9 @@ package com.example.avi.myfirstmap;
 
 import android.content.Intent;
 import android.content.IntentSender;
+import android.content.SharedPreferences;
 import android.location.Location;
+import android.os.ParcelFileDescriptor;
 import android.support.v4.app.FragmentActivity;
 import android.os.Bundle;
 import android.util.DisplayMetrics;
@@ -19,11 +21,16 @@ import com.google.android.gms.common.api.GoogleApiClient;
 
 
 import com.google.android.gms.common.api.ResultCallback;
+import com.google.android.gms.common.api.Status;
 import com.google.android.gms.drive.Drive;
+import com.google.android.gms.drive.DriveApi;
+import com.google.android.gms.drive.DriveContents;
+import com.google.android.gms.drive.DriveFile;
 import com.google.android.gms.drive.DriveFolder;
 import com.google.android.gms.drive.DriveId;
 import com.google.android.gms.drive.DriveResource;
 import com.google.android.gms.drive.Metadata;
+import com.google.android.gms.drive.MetadataChangeSet;
 import com.google.android.gms.drive.OpenFileActivityBuilder;
 
 import com.google.android.gms.location.LocationListener;
@@ -34,6 +41,13 @@ import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.LatLng;
+
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
 
 public class MapsActivity extends FragmentActivity
         implements
@@ -51,6 +65,7 @@ public class MapsActivity extends FragmentActivity
     private static final boolean YES_ZOOM = true;
     private static final boolean NO_ZOOM = false;
     private Location mLastLocation = null;
+    private DriveFile mDriveFile = null;
 
     // These settings are the same as the settings for the map. They will in fact give you updates
     // at the maximal rates currently possible.
@@ -62,6 +77,7 @@ public class MapsActivity extends FragmentActivity
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
         setContentView(R.layout.activity_maps);
 
         mImgMyLocationTracking = (ImageView) findViewById(R.id.imgMyLocationTracking);
@@ -89,15 +105,21 @@ public class MapsActivity extends FragmentActivity
     }
 
     @Override
+    protected void onStart() {
+        super.onStart();
+        mGoogleApiClient.connect();
+    }
+
+    @Override
     protected void onResume() {
         super.onResume();
-        mGoogleApiClient.connect();
+        //mGoogleApiClient.connect();
     }
 
     @Override
     public void onPause() {
         super.onPause();
-        mGoogleApiClient.disconnect();
+        //mGoogleApiClient.disconnect();
     }
 
     @Override
@@ -179,17 +201,34 @@ public class MapsActivity extends FragmentActivity
      */
     @Override
     public void onConnected(Bundle connectionHint) {
-        LocationServices.FusedLocationApi.requestLocationUpdates(
-                mGoogleApiClient,
-                REQUEST,
-                this);  // LocationListener
-
+        LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient, REQUEST, this);  // LocationListener
         mImgMyLocationTracking.setVisibility(View.VISIBLE);
 
-        if (mDriveFolderId != null) {
+        try {
+            SharedPreferences settings = getPreferences(MODE_PRIVATE);
+            mDriveFolderId = DriveId.decodeFromString(settings.getString("DriveFolderId", ""));
             DriveFolder folder = Drive.DriveApi.getFolder(mGoogleApiClient, mDriveFolderId);
-            folder.getMetadata(mGoogleApiClient).setResultCallback(metadataRetrievedCallback);
-        } else {
+            folder.getMetadata(mGoogleApiClient).setResultCallback(new ResultCallback<DriveResource.MetadataResult>() {
+                   @Override
+                   public void onResult(DriveResource.MetadataResult result) {
+                       if (!result.getStatus().isSuccess()) {
+                           Log.i("METADATA", "Problem while trying to fetch metadata.");
+                           getNewFolder();
+                           return;
+                       }
+
+                       Metadata metadata = result.getMetadata();
+                       if(metadata.isTrashed()){
+                           Log.i("METADATA", "Folder is trashed");
+                           getNewFolder();
+                       }else{
+                           Log.i("METADATA", "Folder is not trashed");
+                       }
+                   }
+               });
+        } catch (IllegalArgumentException e) {
+            Log.i("CAUGHT", "ID IS NULL");
+            // mDriveFolderId is null or otherwise invalid
             getNewFolder();
         }
     }
@@ -197,37 +236,16 @@ public class MapsActivity extends FragmentActivity
     private void getNewFolder() {
         mDriveFolderId = null;
         IntentSender intentSender = Drive.DriveApi.newOpenFileActivityBuilder()
-                .setActivityTitle("Pick a destination folder for stored track data")
+                .setActivityTitle("Store data where?")
                 .setMimeType(new String[]{DriveFolder.MIME_TYPE})
                 .build(mGoogleApiClient);
 
         try {
-            startIntentSenderForResult(intentSender, REQUEST_CODE.FILE_OPENER.ordinal(), null, 0, 0, 0);
+            startIntentSenderForResult(intentSender, REQUEST_CODE.FOLDER_OPENER.ordinal(), null, 0, 0, 0);
         } catch (IntentSender.SendIntentException e) {
-            Log.w("INTENT ERROR", "Unable to send intent FILE_OPENER", e);
+            Log.w("INTENT ERROR", "Unable to send intent FOLDER_OPENER", e);
         }
     }
-
-    final private ResultCallback<DriveResource.MetadataResult> metadataRetrievedCallback = new
-            ResultCallback<DriveResource.MetadataResult>() {
-                @Override
-                public void onResult(DriveResource.MetadataResult result) {
-                    if (!result.getStatus().isSuccess()) {
-                        Log.i("METADATA", "Problem while trying to fetch metadata.");
-                        getNewFolder();
-                        return;
-                    }
-
-                    Metadata metadata = result.getMetadata();
-                    if(metadata.isTrashed()){
-                        Log.i("METADATA", "Folder is trashed");
-                        getNewFolder();
-                    }else{
-                        Log.i("METADATA", "Folder is not trashed");
-                    }
-
-                }
-            };
 
 
     /**
@@ -240,7 +258,7 @@ public class MapsActivity extends FragmentActivity
 
     private enum REQUEST_CODE {
         RESOLVE_CONNECTION,
-        FILE_OPENER
+        FOLDER_OPENER
     }
 
     private static final REQUEST_CODE[] RC = REQUEST_CODE.values();
@@ -270,9 +288,63 @@ public class MapsActivity extends FragmentActivity
                     mGoogleApiClient.connect();
                 }
                 break;
-            case FILE_OPENER:
+            case FOLDER_OPENER:
                 if (resultCode == RESULT_OK) {
                     mDriveFolderId = data.getParcelableExtra(OpenFileActivityBuilder.EXTRA_RESPONSE_DRIVE_ID);
+                    SharedPreferences settings = getPreferences(MODE_PRIVATE);
+                    SharedPreferences.Editor settings_editor = settings.edit();
+                    settings_editor.putString("DriveFolderId", mDriveFolderId.encodeToString());
+                    settings_editor.commit();
+
+                    MetadataChangeSet changeSet = new MetadataChangeSet.Builder()
+                            .setTitle(getString(R.string.track_file_name))
+                            .setMimeType(getString(R.string.track_file_mime)).build();
+
+                    DriveFolder mDriveFolder = Drive.DriveApi.getFolder(mGoogleApiClient, mDriveFolderId);
+                    mDriveFolder.createFile(mGoogleApiClient, changeSet, null).setResultCallback(new ResultCallback<DriveFolder.DriveFileResult>() {
+                             @Override
+                             public void onResult(DriveFolder.DriveFileResult driveFileResult) {
+                                 if (!driveFileResult.getStatus().isSuccess()) {
+                                     Log.i("DRIVE FILE", "Problem trying to get file");
+                                     return;
+                                 } else {
+                                     mDriveFile = driveFileResult.getDriveFile();
+                                     mDriveFile.open(mGoogleApiClient, DriveFile.MODE_READ_WRITE, null).setResultCallback(new ResultCallback<DriveApi.DriveContentsResult>() {
+                                         @Override
+                                         public void onResult(DriveApi.DriveContentsResult driveContentsResult) {
+                                             if (!driveContentsResult.getStatus().isSuccess()) {
+                                                 Log.i("FILE CONTENTS", "Error while trying to create new file contents");
+                                                 return;
+                                             }
+                                             DriveContents driveContents = driveContentsResult.getDriveContents();
+
+                                             try {
+                                                 ParcelFileDescriptor parcelFileDescriptor = driveContents.getParcelFileDescriptor();
+                                                 FileInputStream fileInputStream = new FileInputStream(parcelFileDescriptor.getFileDescriptor());
+                                                 // Read to the end of the file.
+                                                 fileInputStream.read(new byte[fileInputStream.available()]);
+
+                                                 // Append to the file.
+                                                 FileOutputStream fileOutputStream = new FileOutputStream(parcelFileDescriptor.getFileDescriptor());
+                                                 Writer writer = new OutputStreamWriter(fileOutputStream);
+                                                 writer.write("hello world");
+                                             } catch (IOException e) {
+                                                 e.printStackTrace();
+                                             }
+
+                                             driveContents.commit(mGoogleApiClient, null).setResultCallback(new ResultCallback<Status>() {
+                                                 @Override
+                                                 public void onResult(Status result) {
+                                                     // Handle the response status
+                                                 }
+                                             });
+
+                                         }
+                                     });
+                                 }
+                             }
+                         });
+
                     Log.i("OPENER", "Selected folder's ID: " + mDriveFolderId);
                 }
                 break;

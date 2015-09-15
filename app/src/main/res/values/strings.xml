@@ -3,4 +3,6 @@
     <string name="title_activity_maps">Map</string>
     <string name="enable_panning">Keep map panned to user location</string>
     <string name="disable_panning">Stop auto-panning map to user location</string>
+    <string name="track_file_name">track_my_potato.trax</string>
+    <string name="track_file_mime">text/plain</string>
 </resources>
