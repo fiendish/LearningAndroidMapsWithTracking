@@ -1,5 +1,8 @@
 package com.example.avi.myfirstmap;
 
+import android.content.Context;
+import android.media.MediaScannerConnection;
+import android.os.Environment;
 import android.content.Intent;
 import android.content.IntentSender;
 import android.content.SharedPreferences;
@@ -42,9 +45,13 @@ import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.LatLng;
 
+import java.io.BufferedWriter;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
@@ -217,7 +224,40 @@ public class MapsActivity extends FragmentActivity
         mImgMyLocationTracking.setVisibility(View.VISIBLE);
 
         fetchMyFile();
+
+        //if (isExternalStorageWritable()) {
+        //    createLocalTestFile();
+        //}
+
     }
+
+    public boolean isExternalStorageWritable() {
+        String state = Environment.getExternalStorageState();
+        if (Environment.MEDIA_MOUNTED.equals(state)) {
+            return true;
+        }
+        return false;
+    }
+
+    private void createLocalTestFile() {
+        try
+        {
+            File traceFile = new File(((Context)this).getExternalFilesDir(null), "Test.txt");
+            BufferedWriter writer = new BufferedWriter(new FileWriter(traceFile, true /*append*/));
+            writer.write("hello world\n");
+            writer.close();
+            // Refresh the MTP data so it can seen by the computer.
+            MediaScannerConnection.scanFile((Context) (this),
+                    new String[]{traceFile.toString()},
+                    null,
+                    null);
+        }
+        catch (IOException e)
+        {
+            Log.e("FileTest", "Unable to write to the Test.txt file.");
+        }
+    }
+
 
     private void fetchMyFile() {
         try {
@@ -311,14 +351,15 @@ public class MapsActivity extends FragmentActivity
 
                 try {
                     ParcelFileDescriptor parcelFileDescriptor = driveContents.getParcelFileDescriptor();
-                    FileInputStream fileInputStream = new FileInputStream(parcelFileDescriptor.getFileDescriptor());
-                    // Read to the end of the file.
-                    fileInputStream.read(new byte[fileInputStream.available()]);
+                    //InputStream fileInputStream = new FileInputStream(parcelFileDescriptor.getFileDescriptor());
+                    //// Read to the end of the file.
+                    //fileInputStream.read(new byte[fileInputStream.available()]);
 
                     // Append to the file.
-                    FileOutputStream fileOutputStream = new FileOutputStream(parcelFileDescriptor.getFileDescriptor());
+                    OutputStream fileOutputStream = new FileOutputStream(parcelFileDescriptor.getFileDescriptor());
                     Writer writer = new OutputStreamWriter(fileOutputStream);
-                    writer.write("hello world");
+                    writer.write("hello world\n");
+                    writer.close();
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -359,7 +400,6 @@ public class MapsActivity extends FragmentActivity
                         public void onResult(DriveFolder.DriveFileResult driveFileResult) {
                             if (!driveFileResult.getStatus().isSuccess()) {
                                 Log.i("DRIVE FILE", "Problem trying to get file");
-                                return;
                             } else {
                                 mDriveFile = driveFileResult.getDriveFile();
                                 mDriveFileId = mDriveFile.getDriveId();
